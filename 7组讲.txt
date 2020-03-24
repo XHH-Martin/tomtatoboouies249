@@ -1,0 +1,38 @@
+select ip,count(*) total 
+from dws_active_web 
+where date_format(dt,'yyyy-MM-dd HH')>='2016-11-09 14' and date_format(dt,'yyyy-MM-dd HH')<='2016-11-09 15' and interface='/api/user/login'
+group by ip
+order by total desc limit 10;
+
+drop table if exists dws_active_web;
+create external table dws_active_web( 
+`dt` string,
+`interface` string,
+`ip` string
+) 
+row format delimited fields terminated by '\t'
+location '/warehouse/gmall/dws/dws_active_web';
+
+insert into table dws_active_web values('2016-11-09 14:22:05','/api/user/login','110.23.5.33');
+insert into table dws_active_web values('2016-11-09 14:23:10','/api/user/detail','57.3.2.16');
+insert into table dws_active_web values('2016-11-09 15:59:40','/api/user/login','200.6.5.166');
+
+insert into table dws_active_web values('2016-11-09 14:28:35','/api/user/login','130.23.5.33');
+insert into table dws_active_web values('2016-11-09 14:50:30','/api/user/detail','527.3.2.16');
+insert into table dws_active_web values('2016-11-09 15:59:40','/api/user/login','203.6.5.166');
+
+insert into table dws_active_web values('2016-11-09 13:22:05','/api/user/login','140.23.5.33');
+insert into table dws_active_web values('2016-11-09 14:23:10','/api/user/detail','557.3.2.16');
+insert into table dws_active_web values('2016-11-09 14:59:40','/api/user/login','230.6.5.166');
+
+insert into table dws_active_web values('2016-11-09 12:22:05','/api/user/login','170.23.5.33');
+insert into table dws_active_web values('2016-11-09 13:23:10','/api/user/detail','567.3.2.16');
+insert into table dws_active_web values('2016-11-09 14:59:40','/api/user/login','290.6.5.166');
+
+insert into table dws_active_web values('2016-11-09 12:22:05','/api/user/login','10.23.5.33');
+insert into table dws_active_web values('2016-11-09 13:23:10','/api/user/detail','57.3.2.16');
+insert into table dws_active_web values('2016-11-09 14:59:40','/api/user/login','29.6.5.166');
+
+insert into table dws_active_web values('2016-11-09 12:22:05','/api/user/login','17.23.5.33');
+insert into table dws_active_web values('2016-11-09 13:23:10','/api/user/detail','67.3.2.16');
+insert into table dws_active_web values('2016-11-09 14:59:40','/api/user/login','90.6.5.166');

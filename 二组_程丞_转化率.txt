@@ -1,0 +1,122 @@
+分析需求：
+	描述：
+		新增用户占日活跃用户比率
+	概念：
+		新增用户/日活跃用户
+	数据来源：
+		ads_uv_count
+		ads_new_mid_count
+	分析步骤：
+		
+
+
+在MySQL中创建ads_new_mid_count表
+
+drop table if exists ads_new_mid_count;
+create external table ads_new_mid_count
+(
+    `create_date`     string comment '创建时间' ,
+    `new_mid_count`   BIGINT comment '新增设备数量' 
+)  COMMENT '每日新增设备信息数量'
+row format delimited fields terminated by '\t'
+location '/warehouse/gmall/ads/ads_new_mid_count/';
+
+
+在MySQL中创建ads_uv_count表
+DROP TABLE IF EXISTS `ads_uv_count`;
+CREATE TABLE `ads_uv_count`  (
+  `dt` varchar(255) DEFAULT NULL COMMENT '统计日期',
+  `day_count` bigint(200) DEFAULT NULL COMMENT '当日用户数量',
+  `wk_count` bigint(200) DEFAULT NULL COMMENT '当周用户数量',
+  `mn_count` bigint(200) DEFAULT NULL COMMENT '当月用户数量',
+  `is_weekend` varchar(200) CHARACTER SET utf8 COLLATE utf8_general_ci DEFAULT NULL COMMENT 'Y,N是否是周末,用于得到本周最终结果',
+  `is_monthend` varchar(200) CHARACTER SET utf8 COLLATE utf8_general_ci DEFAULT NULL COMMENT 'Y,N是否是月末,用于得到本月最终结果'
+) ENGINE = InnoDB CHARACTER SET = utf8 COLLATE = utf8_general_ci COMMENT = '每日活跃用户数量' ROW_FORMAT = Dynamic;
+
+
+
+建表语句：
+drop table if exists ads_user_convert_day;
+create external table ads_user_convert_day( 
+    `dt` string COMMENT '统计日期',
+    `uv_m_count`  bigint COMMENT '当日活跃设备',
+    `new_m_count`  bigint COMMENT '当日新增设备',
+    `new_m_ratio`   decimal(10,2) COMMENT '当日新增占日活的比率'
+) COMMENT '转化率'
+row format delimited fields terminated by '\t'
+location '/warehouse/gmall/ads/ads_user_convert_day/'
+;
+
+
+数据导入
+insert into table ads_user_convert_day
+select
+    '2019-02-10',
+    sum(uc.dc) sum_dc,
+    sum(uc.nmc) sum_nmc,
+    cast(sum( uc.nmc)/sum( uc.dc)*100 as decimal(10,2))  new_m_ratio
+from 
+(
+    select
+        day_count dc,
+        0 nmc
+    from ads_uv_count
+where dt='2019-02-10'
+
+    union all
+    select
+        0 dc,
+        new_mid_count nmc
+    from ads_new_mid_count
+    where create_date='2019-02-10'
+)uc;
+
+
+
+编写脚本
+	①#!/bin/bash
+	②定义变量
+	③处理日期参数
+	④编写sql
+	⑤执行sql
+
+#!/bin/bash
+
+# 定义变量方便修改
+# APP=gmall
+# hive=/opt/module/hive/bin/hive
+
+# 如果是输入的日期按照取输入日期；如果没输入日期取当前时间的前一天
+if [ -n "$1" ] ;then
+	do_date=$1
+else 
+	do_date=`date -d "-1 day" +%F`  
+fi 
+
+sql="
+
+insert into table "$APP".ads_user_convert_day
+select
+    '$do_date',
+    sum(uc.dc) sum_dc,
+    sum(uc.nmc) sum_nmc,
+    cast(sum( uc.nmc)/sum( uc.dc)*100 as decimal(10,2))  new_m_ratio
+from 
+(
+    select
+        day_count dc,
+	nmc.0
+    from ads_uv_count
+where dt='$do_date'
+
+    union all
+    select
+        0 dc,
+        new_mid_count nmc
+    from ads_new_mid_count
+    where create_date='$do_date'
+)uc;
+
+"
+$hive -e "$sql"
+

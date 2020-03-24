@@ -1,0 +1,155 @@
+第9题
+有一个充值日志表如下：
+CREATE TABLE `credit_log` 
+(
+    `dist_id` int（11）DEFAULT NULL COMMENT '区组id',
+    `account` varchar（100）DEFAULT NULL COMMENT '账号',
+    `money` int(11) DEFAULT NULL COMMENT '充值金额',
+    `create_time` datetime DEFAULT NULL COMMENT '订单时间'
+)ENGINE=InnoDB DEFAUILT CHARSET=utf8
+请写出SQL语句，查询充值日志表2015年7月9号每个区组下充值额最大的账号，要求结果：
+区组id，账号，金额，充值时间
+
+
+#MYSQL版本 (1)
+SELECT
+	t1.dist_id,
+	account,
+	m_money,
+	create_time
+FROM
+	(
+	SELECT
+		dist_id,
+		MAX(money) m_money
+	FROM
+		credit_log
+	WHERE
+		DATE_FORMAT(create_time,
+		'%Y-%m-%d')= '2015-07-09'
+	GROUP BY
+		dist_id ) t1
+LEFT JOIN credit_log ON
+	t1.dist_id = credit_log.dist_id
+	AND t1.m_money = credit_log.money
+WHERE
+	DATE_FORMAT(create_time,
+	'%Y-%m-%d') = '2015-07-09' ;
+
+
+#MYSQL版本(2)
+	SELECT
+	t4.dist_id,t4.account,credit_log.money,t4.s_money,credit_log.create_time 
+FROM
+	(
+		SELECT
+			dist_id,
+			account,
+			s_money,
+			rank
+		FROM
+			(
+				SELECT
+					dist_id,
+					account,
+					s_money,
+
+				IF (
+					@grp = dist_id,
+					CASE
+				WHEN @money = t1.s_money THEN
+					@rank
+				WHEN @money := t1.s_money THEN
+					@rank:=@rank + 1
+				END,
+				@rank := 1
+				) AS rank,
+				@grp := dist_id AS dist_id2 ,@money := t1.s_money
+			FROM
+				(
+					SELECT
+						dist_id,
+						account,
+						sum(money) s_money
+					FROM
+						credit_log
+					WHERE
+						DATE_FORMAT(create_time, '%Y-%m-%d') = '2019-06-11'
+					GROUP BY
+						dist_id,
+						account
+				) t1,
+				(
+					SELECT
+						@rank := 0 ,@grp := NULL ,@money := NULL
+				) t2
+			ORDER BY
+				dist_id asc,
+				s_money DESC
+			) t3
+		WHERE
+			t3.rank = 1
+	) t4
+LEFT JOIN credit_log ON t4.dist_id = credit_log.dist_id
+AND t4.account = credit_log.account
+WHERE
+	DATE_FORMAT(create_time, '%Y-%m-%d') = '2015-07-09';
+
+
+
+
+	
+#HIVE版本(1)
+SELECT
+	dist_id,
+	account,
+	create_time
+FROM
+	(
+		SELECT dist_id,
+		account,
+		create_time,
+		money,
+		RANK() OVER(PARTITION BY dist_id
+	ORDER BY
+		money DESC ) ra
+	FROM
+		credit_log
+	WHERE
+		date_format(create_time,
+		'yyyy-MM-dd') = '2015-07-09') t1
+WHERE
+	ra = 1;
+#HIVE版本(2)
+SELECT
+	dist_id,
+	account,
+	m_money,
+	create_time_arr
+FROM
+	(
+	SELECT
+		dist_id,
+		account,
+		m_money,
+		create_time_arr,
+		RANK() OVER(PARTITION BY dist_id
+	ORDER BY
+		m_money DESC) ra
+	FROM
+		(
+		SELECT
+			dist_id,
+			account,
+			collect_set(create_time) create_time_arr,
+			SUM(money) m_money
+		FROM
+			credit_log
+		WHERE
+			date_format(create_time,
+			'yyyy-MM-dd') = '2015-07-09'
+		GROUP BY
+			dist_id,
+			account ) t1 ) t2
+WHERE
+	ra = 1 ;

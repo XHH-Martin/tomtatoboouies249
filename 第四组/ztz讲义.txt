@@ -1,0 +1,169 @@
+复购用户，以月为单位统计，购买此商品两次及以上的用户为复购用户
+品牌复购率，复购用户占购买过此商品的用户的比例。
+需求，在各个一级品类下，品牌月复购率。
+
+需求分析，需要得到一个月内，商品被每个用户购买的次数。
+对商品分组，对每个用户购买的次数进行判断，大于一次为复购，大于两次为购买过，分别求和即为商品的复购用户和购买用户。
+
+
+步骤：
+1，统计每个用户每日购买物品明细，           宽表，作为dws层。
+2，统计每个用户当月对sku的下单数量
+3，统计当月每个sku，下单过这个sku的用户数量，多次下单的用户，计算复购率
+
+
+dws层 每天每个用户购买商品的明细。 
+dws层宽表数据所需表有 dwd层的 用户表 商品表 订单详情表。
+做宽表时，使用union all 联合的几张表内要有相同的字段， 或者没有重复的字段
+所以使用left join。 订单详情表作为主表，因为是事实表
+usr_id sku_id 确定用户当日购买此商品，
+建表：
+drop table if exists dws_sale_detail_daycount;
+create external table dws_sale_detail_daycount
+(   
+    user_id   string  comment '用户 id',
+    sku_id    string comment '商品 Id',
+    user_gender  string comment '用户性别',       
+    user_age string  comment '用户年龄',
+    user_level string comment '用户等级',          用户表
+    order_price decimal(10,2) comment '商品价格',
+    sku_name string   comment '商品名称',
+    sku_tm_id string   comment '品牌id',
+    sku_category3_id string comment '商品三级品类id',
+    sku_category2_id string comment '商品二级品类id',
+    sku_category1_id string comment '商品一级品类id',
+    sku_category3_name string comment '商品三级品类名称',
+    sku_category2_name string comment '商品二级品类名称',
+    sku_category1_name string comment '商品一级品类名称',
+    spu_id  string comment '商品 spu',                   商品表
+    sku_num  int comment '购买个数',
+    order_count string comment '当日下单单数',
+    order_amount string comment '当日下单金额'       订单详情表
+) COMMENT '用户购买商品明细表'
+PARTITIONED BY (`dt` string)
+stored as parquet
+location '/warehouse/gmall/dws/dws_user_sale_detail_daycount/'
+tblproperties ("parquet.compression"="snappy");
+
+
+
+
+用户表
+create external table dwd_user_info( 
+    `id` string COMMENT '用户id',
+    `name`  string COMMENT '姓名',
+    `birthday` string COMMENT '生日',
+    `gender` string COMMENT '性别',
+    `email` string COMMENT '邮箱',
+    `user_level` string COMMENT '用户等级',
+    `create_time` string COMMENT '创建时间'
+
+) 
+PARTITIONED BY (`dt` string)
+
+
+商品表
+create external table dwd_sku_info(
+    `id` string COMMENT 'skuId',
+    `spu_id` string COMMENT 'spuid',
+    `price` decimal(10,2) COMMENT '',
+    `sku_name` string COMMENT '',
+    `sku_desc` string COMMENT '',
+    `weight` string COMMENT '',
+    `tm_id` string COMMENT 'id',
+    `category3_id` string COMMENT '1id',
+    `category2_id` string COMMENT '2id',
+    `category1_id` string COMMENT '3id',
+    `category3_name` string COMMENT '3',
+    `category2_name` string COMMENT '2',
+    `category1_name` string COMMENT '1',
+    `create_time` string COMMENT ''
+) 
+PARTITIONED BY (`dt` string)
+
+
+ 订单详情表
+create external table dwd_order_detail( 
+    `id` string COMMENT '订单编号',
+    `order_id` string  COMMENT '订单号', 
+    `user_id` string COMMENT '用户id',
+    `sku_id` string COMMENT '商品id',
+    `sku_name` string COMMENT '商品名称',
+    `order_price` string COMMENT '商品价格',
+    `sku_num` string COMMENT '商品数量',
+    `create_time` string COMMENT '创建时间
+'
+)
+PARTITIONED BY (`dt` string)
+
+
+ads层， 报表分析 
+需求分析，需要得到一个月内，商品被每个用户购买的次数。
+对商品分组，对每个用户购买的次数进行判断，大于一次为复购，大于两次为购买过，分别求和即为商品的复购用户和购买用户。
+
+
+步骤：
+1，统计每个用户每日购买物品明细，           宽表，作为dws层。
+2，统计每个用户当月对sku的下单数量
+3，统计当月每个sku，下单过这个sku的用户数量，多次下单的用户，计算复购率
+
+drop table ads_sale_tm_category1_stat_mn;
+create external table ads_sale_tm_category1_stat_mn
+(   
+    tm_id string comment '品牌id',
+    category1_id string comment '1级品类id ',
+    category1_name string comment '1级品类名称 ',
+    buycount   bigint comment  '购买人数',
+    buy_twice_last bigint  comment '两次以上购买人数',
+    buy_twice_last_ratio decimal(10,2)  comment  '单次复购率',
+    buy_3times_last   bigint comment   '三次以上购买人数',
+    buy_3times_last_ratio decimal(10,2)  comment  '多次复购率',
+    stat_mn string comment '统计月份',
+    stat_date string comment '统计日期' 
+)   COMMENT '复购率统计'
+row format delimited fields terminated by '\t'
+location '/warehouse/gmall/ads/ads_sale_tm_category1_stat_mn/'
+;
+
+create external table dws_sale_detail_daycount
+(   
+    user_id   string  comment '用户 id',
+    sku_id    string comment '商品 Id',
+    user_gender  string comment '用户性别',       
+    user_age string  comment '用户年龄',
+    user_level string comment '用户等级',        
+    order_price decimal(10,2) comment '商品价格',
+    sku_name string   comment '商品名称',
+    sku_tm_id string   comment '品牌id',
+    sku_category3_id string comment '商品三级品类id',
+    sku_category2_id string comment '商品二级品类id',
+    sku_category1_id string comment '商品一级品类id',
+    sku_category3_name string comment '商品三级品类名称',
+    sku_category2_name string comment '商品二级品类名称',
+    sku_category1_name string comment '商品一级品类名称',
+    spu_id  string comment '商品 spu',           
+    sku_num  int comment '购买个数',
+    order_count string comment '当日下单单数',
+    order_amount string comment '当日下单金额'   
+) COMMENT '用户购买商品明细表'
+
+
+#!/bin/bash
+
+# 定义变量方便修改
+APP=gmall
+hive=/opt/module/hive/bin/hive
+
+# 如果是输入的日期按照取输入日期；如果没输入日期取当前时间的前一天
+if [ -n "$1" ] ;then
+	do_date=$1
+else 
+	do_date=`date -d "-1 day" +%F`  
+fi 
+
+sql="
+set hive.exec.dynamic.partition.mode=nonstrict;
+
+"
+
+$hive -e "$sql"
